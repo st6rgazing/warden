@@ -30,3 +30,15 @@ test('status lists running subagents', () => {
   store.writeJSON('sessions/s2.json', { sid: 's2', startedAt: Date.now(), agents: { main: { id: 'main' }, q: { id: 'q', agentType: 'Explore', ended: false, startedAt: Date.now(), spent: { tokens: 1000 }, toolCalls: 10 } } });
   assert.match(status(), /Explore/);
 });
+
+test('--today counts only usage in the window, even for an old session', () => {
+  const now = Date.now();
+  store.writeJSON('sessions/old.json', { sid: 'old', startedAt: now - 3 * 86400000, updatedAt: now, agents: { main: { id: 'main', spent: { tokens: 9e6, weekPct: 30 }, toolCalls: 900 } } });
+  store.appendLedger({ type: 'call', session: 'old', id: 'main', agentType: 'main', source: 'tool:Bash', tokens: 1e6, usd: 0 });
+  const { runReport } = require('../src/cli');
+  const out = runReport(['--today']);
+  const row = out.split('\n').find((l) => l.startsWith('main thread'));
+  assert.ok(row, out);
+  assert.match(row, /1\.0M/);
+  assert.doesNotMatch(row, /9\.0M/);
+});

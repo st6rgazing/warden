@@ -63,3 +63,8 @@ test('shim runs the wrapper found in root.json (I6)', () => {
   const r2 = spawnSync(process.execPath, [path.join(HOME, 'status-shim.js')], { input: JSON.stringify(limitsPayload), env: { ...process.env, WARDEN_HOME: HOME } });
   assert.equal(r2.status, 0);
 });
+
+test('original that prints then exits non-zero still shows its text', () => {
+  const r = run(limitsPayload, `${JSON.stringify(process.execPath)} -e "process.stdout.write('mine');process.exit(3)"`);
+  assert.equal(r.stdout.toString(), 'mine ⛨ wk 41% · 5h 24%\n');
+});

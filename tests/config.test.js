@@ -34,3 +34,14 @@ test('malformed json falls back to defaults with a warning', () => {
   assert.equal(c.subagent.weekPct, 2);
   assert.match(loadConfig.lastWarning, /config/);
 });
+
+test('wrong-type values are ignored, rest still applies', () => {
+  const home = tmp();
+  fs.writeFileSync(path.join(home, 'config.json'), JSON.stringify({ spawn: null, subagent: { minutes: 'lots', toolCalls: 99 } }));
+  const { loadConfig } = fresh(home);
+  const c = loadConfig(tmp());
+  assert.equal(c.spawn.maxDepth, 2);
+  assert.equal(c.subagent.minutes, 45);
+  assert.equal(c.subagent.toolCalls, 99);
+  assert.match(loadConfig.lastWarning, /spawn|minutes/);
+});

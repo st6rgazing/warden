@@ -166,3 +166,20 @@ test('lock held elsewhere: hook skips instead of running unlocked (I4)', () => {
   finally { fs.rmdirSync(lock); }
   assert.equal(store.readJSON(`sessions/${s.sid}.json`, 'none'), 'none');
 });
+
+test('bad config warning is logged once, not every call', () => {
+  const s = session();
+  fs.mkdirSync(path.join(s.base.cwd, '.claude'));
+  fs.writeFileSync(path.join(s.base.cwd, '.claude', 'warden.json'), '{oops');
+  const log = path.join(HOME, 'errors.log');
+  const before = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').split('\n').length : 0;
+  for (let i = 0; i < 5; i++) handle(s.ev(pre({})));
+  const after = fs.readFileSync(log, 'utf8').split('\n').length;
+  assert.equal(after - before, 1);
+});
+
+test('session records carry updatedAt', () => {
+  const s = session();
+  handle(s.ev(pre({})), 4242);
+  assert.equal(store.readJSON(`sessions/${s.sid}.json`).updatedAt, 4242);
+});
