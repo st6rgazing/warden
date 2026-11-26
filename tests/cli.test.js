@@ -42,3 +42,18 @@ test('--today counts only usage in the window, even for an old session', () => {
   assert.match(row, /1\.0M/);
   assert.doesNotMatch(row, /9\.0M/);
 });
+
+test('allow also clears a subagent loop block', () => {
+  store.writeJSON('sessions/s9.json', { sid: 's9', startedAt: 1, agents: { main: { id: 'main' },
+    z: { id: 'z', agentType: 'Explore', denials: 1, lastDeniedAt: 99, history: [{ hash: 'h', ts: 1 }], spent: {}, toolCalls: 0 } } });
+  allow('+10%');
+  assert.deepEqual(store.readJSON('sessions/s9.json').agents.z.history, []);
+});
+
+test('week report starts at the current weekly window when known', () => {
+  const now = Date.now();
+  const resets = Math.floor((now + 2 * 86400000) / 1000);
+  store.writeJSON('state/zz.json', { rate_limits: { seven_day: { used_percentage: 10, resets_at: resets } } });
+  const { weekStart } = require('../src/cli');
+  assert.equal(weekStart(now), resets * 1000 - 7 * 86400000);
+});

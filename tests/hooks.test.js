@@ -183,3 +183,16 @@ test('session records carry updatedAt', () => {
   handle(s.ev(pre({})), 4242);
   assert.equal(store.readJSON(`sessions/${s.sid}.json`).updatedAt, 4242);
 });
+
+test('SessionStart prunes Warden data older than 30 days', () => {
+  const old = Date.now() - 40 * 86400000;
+  store.writeJSON('sessions/ancient.json', { sid: 'ancient', agents: {} });
+  fs.mkdirSync(path.join(HOME, 'ledger'), { recursive: true });
+  const oldLedger = path.join(HOME, 'ledger', '2026-01-01.jsonl'); fs.writeFileSync(oldLedger, '{}\n');
+  for (const f of [path.join(HOME, 'sessions', 'ancient.json'), oldLedger]) fs.utimesSync(f, old / 1000, old / 1000);
+  const s = session();
+  handle(s.ev({ hook_event_name: 'SessionStart' }));
+  assert.equal(fs.existsSync(path.join(HOME, 'sessions', 'ancient.json')), false);
+  assert.equal(fs.existsSync(oldLedger), false);
+  assert.ok(fs.existsSync(path.join(HOME, 'sessions', `${s.sid}.json`)));
+});

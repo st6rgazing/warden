@@ -53,3 +53,12 @@ test('priceUsd uses model family', () => {
   assert.ok(priceUsd({ model: 'claude-opus-5-5', input: 1e6, output: 0, cacheCreate: 0, cacheRead: 0 }) > priceUsd({ model: 'claude-haiku-5-5', input: 1e6, output: 0, cacheCreate: 0, cacheRead: 0 }));
   assert.ok(priceUsd({ model: 'mystery', input: 1e6, output: 0, cacheCreate: 0, cacheRead: 0 }) > 0);
 });
+
+test('agent ids already prefixed with agent- are not doubled', () => {
+  assert.equal(subagentTranscript({ agent_id: 'agent-abc123', transcript_path: '/p/s.jsonl', session_id: 's' }), path.join('/p', 's', 'subagents', 'agent-abc123.jsonl'));
+});
+
+test('mcp_server field wins for source', () => {
+  const { main } = layout();
+  assert.equal(account({ session_id: 'sess1', transcript_path: main, tool_name: 'mcp__x__y', mcp_server: 'github' }).source, 'mcp:github');
+});
