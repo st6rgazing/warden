@@ -24,7 +24,7 @@ function priceUsd(u) {
 function account(evt) {
   const agentId = evt.agent_id || 'main';
   const file = evt.agent_id ? subagentTranscript(evt) : evt.transcript_path;
-  const usage = file ? readNewUsage(file, `${evt.session_id}:${agentId}:${file}`) : [];
+  const usage = file ? readNewUsage(file, `${evt.session_id}:${agentId}:${file}`, { skipSidechain: !evt.agent_id }) : [];
   const delta = { tokens: 0, usd: 0 };
   for (const u of usage) { delta.tokens += costWeighted(u); delta.usd += priceUsd(u); }
   return { agentId, delta, source: sourceOf(evt.tool_name) };
