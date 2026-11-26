@@ -39,3 +39,20 @@ test('setup when settings file does not exist', () => {
   setup(f, ROOT);
   assert.ok(JSON.parse(fs.readFileSync(f, 'utf8')).statusLine);
 });
+
+test('setup refuses to touch unparseable settings (I1)', () => {
+  const f = settingsFile(null);
+  fs.writeFileSync(f, '{ "model": "opus", }');
+  assert.match(setup(f, ROOT), /could not read/i);
+  assert.equal(fs.readFileSync(f, 'utf8'), '{ "model": "opus", }');
+});
+
+test('status line points at a stable shim, not the versioned plugin dir (I6)', () => {
+  const f = settingsFile({});
+  setup(f, ROOT);
+  const cmd = JSON.parse(fs.readFileSync(f, 'utf8')).statusLine.command;
+  assert.ok(cmd.includes(store.home()), cmd);
+  assert.ok(!cmd.includes(ROOT), cmd);
+  assert.ok(fs.existsSync(path.join(store.home(), 'status-shim.js')));
+  assert.equal(store.readJSON('root.json', {}).root, ROOT);
+});

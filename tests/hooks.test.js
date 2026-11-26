@@ -75,7 +75,8 @@ test('no state and no session record: everything allows', () => {
 
 test('loop: 8th identical call is denied, warning delivered once', () => {
   const s = session();
-  const same = { tool_name: 'Bash', tool_input: { command: 'ls' } };
+  handle(s.ev({ hook_event_name: 'SubagentStart', agent_id: 'L1' }));
+  const same = { agent_id: 'L1', tool_name: 'Bash', tool_input: { command: 'ls' } };
   let warns = 0, last;
   for (let i = 0; i < 8; i++) {
     last = handle(s.ev(pre(same)));
@@ -116,7 +117,52 @@ test('CLI prints the decision JSON', () => {
 
 test('deny records lastDeniedAt for /warden allow', () => {
   const s = session();
-  const same = { tool_name: 'Bash', tool_input: { command: 'pwd' } };
+  handle(s.ev({ hook_event_name: 'SubagentStart', agent_id: 'P1' }), 5000);
+  const same = { agent_id: 'P1', tool_name: 'Bash', tool_input: { command: 'pwd' } };
   for (let i = 0; i < 8; i++) handle(s.ev(pre(same)), 5000 + i);
-  assert.equal(store.readJSON(`sessions/${s.sid}.json`).agents.main.lastDeniedAt, 5007);
+  assert.equal(store.readJSON(`sessions/${s.sid}.json`).agents.P1.lastDeniedAt, 5007);
+});
+
+test('main thread is never loop-denied (C1)', () => {
+  const s = session();
+  const same = { tool_name: 'Bash', tool_input: { command: 'npm test' } };
+  for (let i = 0; i < 12; i++) assert.notEqual(decision(handle(s.ev(pre(same)))), 'deny');
+});
+
+test('agents silent for 10+ minutes do not count as running (I2)', () => {
+  const s = session(); const t0 = 1e12;
+  for (let i = 0; i < 4; i++) {
+    handle(s.ev(pre({ tool_name: 'Agent', tool_input: { prompt: String(i) } })), t0);
+    handle(s.ev({ hook_event_name: 'SubagentStart', agent_id: `g${i}` }), t0);
+  }
+  assert.equal(decision(handle(s.ev(pre({ tool_name: 'Agent', tool_input: { prompt: 'x' } })), t0 + 1000)), 'deny');
+  assert.notEqual(decision(handle(s.ev(pre({ tool_name: 'Agent', tool_input: { prompt: 'y' } })), t0 + 11 * 60000)), 'deny');
+});
+
+test('rejected spawns do not leave stale depths (I3)', () => {
+  const s = session(); const t0 = 2e12;
+  handle(s.ev(pre({ tool_name: 'Agent', tool_input: { prompt: 'a' } })), t0);
+  handle(s.ev({ hook_event_name: 'SubagentStart', agent_id: 'r1' }), t0);
+  handle(s.ev(pre({ agent_id: 'r1', tool_name: 'Task', tool_input: { prompt: 'rejected by user' } })), t0 + 1000);
+  handle(s.ev({ hook_event_name: 'SubagentStop', agent_id: 'r1' }), t0 + 2000);
+  handle(s.ev(pre({ tool_name: 'Agent', tool_input: { prompt: 'b' } })), t0 + 5 * 60000);
+  handle(s.ev({ hook_event_name: 'SubagentStart', agent_id: 'r2' }), t0 + 5 * 60000);
+  assert.equal(store.readJSON(`sessions/${s.sid}.json`).agents.r2.depth, 1);
+});
+
+test('no status line state yet: subscribers are not put on dollar caps (M2)', () => {
+  const s = session();
+  handle(s.ev({ hook_event_name: 'SubagentStart', agent_id: 'm2' }));
+  store.update(`sessions/${s.sid}.json`, null, (x) => { x.agents.m2.spent.usd = 50; return x; });
+  assert.notEqual(decision(handle(s.ev(pre({ agent_id: 'm2' })))), 'deny');
+});
+
+test('lock held elsewhere: hook skips instead of running unlocked (I4)', () => {
+  const s = session({ seven_day: { used_percentage: 96 } });
+  fs.mkdirSync(path.join(HOME, 'sessions'), { recursive: true });
+  const lock = path.join(HOME, 'sessions', `${s.sid}.json.lock`);
+  fs.mkdirSync(lock);
+  try { assert.equal(handle(s.ev(pre({ tool_name: 'Agent', tool_input: {} }))), null); }
+  finally { fs.rmdirSync(lock); }
+  assert.equal(store.readJSON(`sessions/${s.sid}.json`, 'none'), 'none');
 });

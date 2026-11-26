@@ -46,3 +46,10 @@ test('costWeighted weights cache reads at 0.1', () => {
 test('missing file returns empty', () => {
   assert.deepEqual(readNewUsage('/no/such/file.jsonl', 'k4'), []);
 });
+
+test('skipSidechain ignores inline subagent lines (I5)', () => {
+  const p = copyFixture();
+  fs.appendFileSync(p, '{"type":"assistant","isSidechain":true,"message":{"id":"sc1","usage":{"input_tokens":9,"output_tokens":9}}}\n');
+  const got = readNewUsage(p, 'k5', { skipSidechain: true });
+  assert.ok(!got.some((u) => u.id === 'sc1'));
+});

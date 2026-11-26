@@ -53,3 +53,13 @@ test('garbage stdin: still prints a badge', () => {
   assert.equal(r.status, 0);
   assert.equal(r.stdout.toString(), '⛨\n');
 });
+
+test('shim runs the wrapper found in root.json (I6)', () => {
+  const { installShim } = require('../src/setup');
+  installShim(path.join(__dirname, '..'));
+  const r = spawnSync(process.execPath, [path.join(HOME, 'status-shim.js')], { input: JSON.stringify(limitsPayload), env: { ...process.env, WARDEN_HOME: HOME } });
+  assert.match(r.stdout.toString(), /⛨ wk 41%/);
+  store.writeJSON('root.json', { root: '/gone' });
+  const r2 = spawnSync(process.execPath, [path.join(HOME, 'status-shim.js')], { input: JSON.stringify(limitsPayload), env: { ...process.env, WARDEN_HOME: HOME } });
+  assert.equal(r2.status, 0);
+});
