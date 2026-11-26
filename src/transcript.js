@@ -15,7 +15,7 @@ function costWeighted(u) {
 
 // Reads assistant usage appended since the last call for this key.
 // Only complete lines advance the offset; message ids already counted are skipped.
-function readNewUsage(file, offsetKey) {
+function readNewUsage(file, offsetKey, opts = {}) {
   let fd;
   try { fd = fs.openSync(file, 'r'); } catch { return []; }
   try {
@@ -34,6 +34,7 @@ function readNewUsage(file, offsetKey) {
       let e; try { e = JSON.parse(line); } catch { continue; }
       const m = e && e.type === 'assistant' && e.message;
       if (!m || !m.usage) continue;
+      if (opts.skipSidechain && e.isSidechain) continue;
       const id = m.id || e.uuid;
       if (id && seen.has(id)) continue;
       if (id) seen.add(id);
