@@ -6,7 +6,8 @@ const { priceFor, CACHE_WRITE, CACHE_READ } = require('./prices');
 function subagentTranscript(evt) {
   if (evt.agent_transcript_path) return evt.agent_transcript_path;
   if (!evt.transcript_path || !evt.agent_id) return null;
-  return path.join(path.dirname(evt.transcript_path), evt.session_id, 'subagents', `agent-${evt.agent_id}.jsonl`);
+  const id = String(evt.agent_id).replace(/^agent-/, '');
+  return path.join(path.dirname(evt.transcript_path), evt.session_id, 'subagents', `agent-${id}.jsonl`);
 }
 
 function sourceOf(toolName) {
@@ -27,7 +28,7 @@ function account(evt) {
   const usage = file ? readNewUsage(file, `${evt.session_id}:${agentId}:${file}`, { skipSidechain: !evt.agent_id }) : [];
   const delta = { tokens: 0, usd: 0 };
   for (const u of usage) { delta.tokens += costWeighted(u); delta.usd += priceUsd(u); }
-  return { agentId, delta, source: sourceOf(evt.tool_name) };
+  return { agentId, delta, source: evt.mcp_server ? `mcp:${evt.mcp_server}` : sourceOf(evt.tool_name) };
 }
 
 function splitWeekPct(deltaPct, agents) {
