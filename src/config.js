@@ -20,11 +20,20 @@ function wardenHome() {
   return process.env.WARDEN_HOME || path.join(os.homedir(), '.claude', 'warden');
 }
 
-function merge(base, over) {
-  const out = Array.isArray(base) ? base.slice() : { ...base };
-  for (const [k, v] of Object.entries(over || {})) {
-    out[k] = v && typeof v === 'object' && !Array.isArray(v) && base[k] && typeof base[k] === 'object'
-      ? merge(base[k], v) : v;
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+// Deep merge; a value whose type doesn't match the default is ignored with a warning.
+function merge(base, over, where = '') {
+  const out = { ...base };
+  if (!isObj(over)) return out;
+  for (const [k, v] of Object.entries(over)) {
+    const key = where ? `${where}.${k}` : k;
+    if (!(k in base)) { out[k] = v; continue; }
+    if (isObj(base[k])) {
+      if (isObj(v)) out[k] = merge(base[k], v, key);
+      else loadConfig.lastWarning = `Warden: ignoring config "${key}" (expected an object)`;
+    } else if (typeof v === typeof base[k]) out[k] = v;
+    else loadConfig.lastWarning = `Warden: ignoring config "${key}" (expected a ${typeof base[k]})`;
   }
   return out;
 }
