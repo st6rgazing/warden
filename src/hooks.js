@@ -75,6 +75,10 @@ function onSubagentStop(s, evt, now) {
   const a = s.agents[evt.agent_id];
   if (!a || a.ended) return null;
   a.ended = true;
+  try {
+    const { delta } = account(evt); // final reply after the last tool call
+    a.spent.tokens += delta.tokens; a.spent.usd += delta.usd;
+  } catch (e) { store.logError(e); }
   store.appendLedger({ type: 'agent', session: s.sid, id: a.id, agentType: a.agentType || evt.agent_type || 'unknown',
     tokens: a.spent.tokens, usd: a.spent.usd, weekPct: a.spent.weekPct, toolCalls: a.toolCalls,
     minutes: (now - a.startedAt) / 60000, stoppedByWarden: a.stoppedByWarden });
