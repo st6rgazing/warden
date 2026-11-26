@@ -172,7 +172,10 @@ function onPostToolUse(s, evt, cfg, st, now) {
 
 function handle(evt, now = Date.now()) {
   const cfg = loadConfig(evt.cwd);
-  if (loadConfig.lastWarning) store.logError(loadConfig.lastWarning);
+  if (loadConfig.lastWarning && store.readJSON('cfgwarn.json', {}).msg !== loadConfig.lastWarning) {
+    store.logError(loadConfig.lastWarning);
+    store.writeJSON('cfgwarn.json', { msg: loadConfig.lastWarning });
+  }
   if (!cfg.enabled || !evt.session_id) return null;
   const st = latestState(evt.session_id);
   let out = null;
@@ -181,6 +184,7 @@ function handle(evt, now = Date.now()) {
   }
   store.update(`sessions/${evt.session_id}.json`, null, (s) => {
     s = s || newSession(evt.session_id, now);
+    s.updatedAt = now;
     switch (evt.hook_event_name) {
       case 'SessionStart': out = onSessionStart(s, evt, cfg, st); break;
       case 'SubagentStart': out = onSubagentStart(s, evt, now); break;
