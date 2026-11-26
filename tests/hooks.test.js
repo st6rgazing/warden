@@ -113,3 +113,10 @@ test('CLI prints the decision JSON', () => {
   assert.equal(r.status, 0);
   assert.equal(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, 'ask');
 });
+
+test('deny records lastDeniedAt for /warden allow', () => {
+  const s = session();
+  const same = { tool_name: 'Bash', tool_input: { command: 'pwd' } };
+  for (let i = 0; i < 8; i++) handle(s.ev(pre(same)), 5000 + i);
+  assert.equal(store.readJSON(`sessions/${s.sid}.json`).agents.main.lastDeniedAt, 5007);
+});
