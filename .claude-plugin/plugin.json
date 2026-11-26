@@ -1,0 +1,6 @@
+{
+  "name": "warden",
+  "version": "0.1.0",
+  "description": "Enforced usage budgets for subagents and sessions, plus a where-did-my-usage-go report.",
+  "license": "MIT"
+}
