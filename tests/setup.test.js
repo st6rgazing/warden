@@ -18,7 +18,7 @@ test('setup wraps existing status line and off restores it exactly', () => {
   const before = fs.readFileSync(f, 'utf8');
   setup(f, ROOT);
   const s = JSON.parse(fs.readFileSync(f, 'utf8'));
-  assert.equal(s.statusLine.command, 'node "/opt/warden/bin/warden-status.js"');
+  assert.equal(s.statusLine.command, `node "${path.join(store.home(), 'status-shim.js')}"`);
   assert.equal(store.readJSON('statusline.json', {}).command, 'my-line.sh');
   assert.ok(fs.existsSync(f + '.warden-bak'));
   setup(f, ROOT);
