@@ -3,8 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const { wardenHome } = require('./config');
 
-const LOCK_WAIT_MS = 200;
-const STALE_LOCK_MS = 2000;
+const LOCK_WAIT_MS = 2000;
+const STALE_LOCK_MS = 10000;
 
 function home() { return wardenHome(); }
 function abs(rel) { return path.join(home(), rel); }
@@ -37,12 +37,14 @@ function acquire(lockDir) {
   }
 }
 
-// Read-modify-write under a lock. On lock timeout, runs unlocked (fail open).
-function update(rel, fallback, fn) {
+// Read-modify-write under a lock. On lock timeout: with { required: true } the
+// update is skipped (returns undefined); otherwise it runs unlocked.
+function update(rel, fallback, fn, opts = {}) {
   const file = abs(rel);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const lockDir = `${file}.lock`;
   const locked = acquire(lockDir);
+  if (!locked && opts.required) return undefined;
   try {
     const next = fn(readJSON(rel, fallback));
     writeJSON(rel, next);
