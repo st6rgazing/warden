@@ -84,12 +84,12 @@ function onPreToolUse(s, evt, cfg, st, now) {
   const loop = rules.checkLoop(a.history, hash, now, cfg);
   a.history.push({ hash, ts: now });
   if (a.history.length > HISTORY_KEEP) a.history.splice(0, a.history.length - HISTORY_KEEP);
-  if (loop.action === 'deny') return deny(s, a, loop.reason);
+  if (loop.action === 'deny') return deny(s, a, loop.reason, now);
   if (loop.action === 'warn') note(a, loop);
 
   if (a.id !== 'main') {
     const d = ladder.evaluate(a, limitsFor(a, mode, cfg, st), cfg, now);
-    if (d.action === 'deny' || d.action === 'hardstop') return deny(s, a, d.reason);
+    if (d.action === 'deny' || d.action === 'hardstop') return deny(s, a, d.reason, now);
     if (d.action === 'warn') note(a, d);
   }
 
@@ -108,7 +108,7 @@ function onPreToolUse(s, evt, cfg, st, now) {
   if (SPAWN_TOOLS.has(evt.tool_name)) {
     const active = Object.values(s.agents).filter((x) => x.id !== 'main' && !x.ended);
     const sp = rules.checkSpawn(active, a.depth, cfg);
-    if (sp.action === 'deny') return deny(s, a, sp.reason);
+    if (sp.action === 'deny') return deny(s, a, sp.reason, now);
     const wk = rules.checkWeekly(st.rate_limits, cfg);
     if (wk.action === 'ask') return pre('ask', wk.reason);
     if (wk.action === 'warn') note(a, wk);
@@ -117,7 +117,8 @@ function onPreToolUse(s, evt, cfg, st, now) {
   return null;
 }
 
-function deny(s, a, reason) {
+function deny(s, a, reason, now) {
+  a.lastDeniedAt = now;
   a.denials += 1;
   a.stoppedByWarden = a.stoppedByWarden || reason === ladder.STOP_REASON;
   store.appendLedger({ type: 'deny', session: s.sid, id: a.id, agentType: a.agentType, reason });
