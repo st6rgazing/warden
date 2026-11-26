@@ -7,7 +7,7 @@ Instructions in CLAUDE.md are suggestions the model can ignore. Warden's limits 
 ## What it does
 
 - **Per-subagent budget.** Each subagent gets 2% of your weekly limit (or $3 on API keys), 45 minutes and 250 tool calls. At 75% it's told to wrap up. At 100% its tool calls are refused and it's told to report what it found, so the work still reaches your main conversation.
-- **Runaway shapes.** Blocks subagents nested more than 2 deep, more than 4 at once, and the same tool call repeated 8 times in 10 minutes (warns at 5).
+- **Runaway shapes.** Blocks subagents nested more than 2 deep, more than 4 running at once, and a subagent repeating the same tool call 8 times in 10 minutes (warns at 5). Your main conversation only gets a heads-up, never a block.
 - **Weekly guard.** Warns at 80% of your weekly limit; at 95% it asks before starting new subagents. Warns if your 5-hour window will run out within 30 minutes at the current pace.
 - **Report.** `/warden report` shows usage by main thread, subagent type and MCP server. `--md` saves it for a bug report or support ticket.
 
