@@ -1,5 +1,15 @@
 # Harness facts (Task 0)
 
+## Confirmed from the hooks docs (2026-11-25)
+
+- SubagentStart gives `agent_id` and `agent_type`; ids may look like `agent-abc123`.
+- SubagentStop also gives `agent_transcript_path` and `last_assistant_message`.
+- Subagent transcripts live at `<project dir>/<session id>/subagents/agent-<id>.jsonl`.
+- PostToolUse gives `tool_response`, `tool_use_id`, `duration_ms`, and `mcp_server` for MCP tools; `additionalContext` goes under `hookSpecificOutput`.
+- Still unconfirmed: whether `continue:false` in a subagent ends only the subagent (Warden doesn't use it), and whether `CLAUDE_PLUGIN_ROOT` is set inside slash-command `!` bash.
+
+## Original assumptions
+
 Live probe could not run in the build environment (no Claude Code login). Run `scripts/probe.sh` on a real machine to confirm. Until then Warden is written to tolerate every open answer:
 
 | Question | Assumption in code | Safe if wrong because |
