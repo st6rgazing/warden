@@ -206,3 +206,15 @@ test('SubagentStop counts the final reply after the last tool call', () => {
   const e = store.readLedger().find((x) => x.type === 'agent' && x.id === 'fin');
   assert.equal(e.tokens, 700);
 });
+
+test('same subagent log reached by two path spellings is counted once', () => {
+  const s = session();
+  handle(s.ev({ hook_event_name: 'SubagentStart', agent_id: 'agent-dup' }));
+  const dir = path.join(path.dirname(s.base.transcript_path), s.sid, 'subagents');
+  fs.mkdirSync(dir, { recursive: true });
+  const tp = path.join(dir, 'agent-dup.jsonl');
+  fs.writeFileSync(tp, '{"type":"assistant","message":{"id":"d1","usage":{"input_tokens":0,"output_tokens":300}}}\n');
+  handle(s.ev(post({ agent_id: 'agent-dup' })));
+  handle(s.ev({ hook_event_name: 'SubagentStop', agent_id: 'agent-dup', agent_transcript_path: dir + '/./agent-dup.jsonl' }));
+  assert.equal(store.readLedger().find((x) => x.type === 'agent' && x.id === 'agent-dup').tokens, 300);
+});
