@@ -83,4 +83,18 @@ function logError(err) {
   } catch { /* never throw from the error logger */ }
 }
 
-module.exports = { home, readJSON, writeJSON, update, appendLedger, readLedger, logError };
+// Delete Warden's own files older than maxAgeMs. Returns how many were removed.
+function prune(maxAgeMs, now = Date.now()) {
+  let n = 0;
+  for (const dir of ['ledger', 'sessions', 'state', 'pace', 'offsets']) {
+    let files = [];
+    try { files = fs.readdirSync(abs(dir)); } catch { continue; }
+    for (const f of files) {
+      const p = path.join(abs(dir), f);
+      try { if (now - fs.statSync(p).mtimeMs > maxAgeMs) { fs.rmSync(p, { recursive: true, force: true }); n++; } } catch { /* raced */ }
+    }
+  }
+  return n;
+}
+
+module.exports = { prune, home, readJSON, writeJSON, update, appendLedger, readLedger, logError };
