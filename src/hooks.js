@@ -7,6 +7,7 @@ const { account, splitWeekPct } = require('./accounting');
 
 const SPAWN_TOOLS = new Set(['Agent', 'Task']);
 const HISTORY_KEEP = 50;
+const RETAIN_MS = 30 * 86400000; // keep 30 days of Warden data
 const IDLE_MS = 10 * 60000; // an agent silent this long no longer counts as running
 const SPAWN_TTL_MS = 2 * 60000; // a spawn not started within this is treated as rejected
 
@@ -180,6 +181,7 @@ function handle(evt, now = Date.now()) {
   const st = latestState(evt.session_id);
   let out = null;
   if (evt.hook_event_name === 'SessionStart') {
+    try { store.prune(RETAIN_MS, now); } catch (e) { store.logError(e); }
     try { const root = require('path').resolve(__dirname, '..'); if (store.readJSON('root.json', {}).root !== root) store.writeJSON('root.json', { root }); } catch (e) { store.logError(e); }
   }
   store.update(`sessions/${evt.session_id}.json`, null, (s) => {
