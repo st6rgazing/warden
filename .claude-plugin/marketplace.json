@@ -1,0 +1,12 @@
+{
+  "name": "warden",
+  "owner": { "name": "st6rgazing" },
+  "plugins": [
+    {
+      "name": "warden",
+      "source": "./",
+      "description": "Enforced usage budgets for Claude Code subagents and sessions, plus a where-did-my-usage-go report.",
+      "version": "0.1.0"
+    }
+  ]
+}
