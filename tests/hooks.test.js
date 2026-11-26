@@ -196,3 +196,13 @@ test('SessionStart prunes Warden data older than 30 days', () => {
   assert.equal(fs.existsSync(oldLedger), false);
   assert.ok(fs.existsSync(path.join(HOME, 'sessions', `${s.sid}.json`)));
 });
+
+test('SubagentStop counts the final reply after the last tool call', () => {
+  const s = session();
+  handle(s.ev({ hook_event_name: 'SubagentStart', agent_id: 'fin' }));
+  const tp = path.join(path.dirname(s.base.transcript_path), 'fin.jsonl');
+  fs.writeFileSync(tp, '{"type":"assistant","message":{"id":"f1","usage":{"input_tokens":0,"output_tokens":700}}}\n');
+  handle(s.ev({ hook_event_name: 'SubagentStop', agent_id: 'fin', agent_transcript_path: tp }));
+  const e = store.readLedger().find((x) => x.type === 'agent' && x.id === 'fin');
+  assert.equal(e.tokens, 700);
+});
