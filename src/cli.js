@@ -55,12 +55,18 @@ function windowed(sessions, calls) {
   }).filter((s) => Object.keys(s.agents).length);
 }
 
+// Start of the current weekly limit window when known, else 7 days ago.
+function weekStart(now) {
+  const wk = (latestRateLimits() || {}).seven_day;
+  return wk && wk.resets_at ? wk.resets_at * 1000 - 7 * DAY : now - 7 * DAY;
+}
+
 function runReport(args, cwd = process.cwd()) {
   const all = sessionFiles();
   let sessions, since, label;
   if (args.includes('--session')) { sessions = all.slice(0, 1); since = sessions[0] ? sessions[0].startedAt : Date.now(); label = 'latest session'; }
   else if (args.includes('--today')) { since = Date.now() - DAY; label = 'last 24 hours'; }
-  else { since = Date.now() - 7 * DAY; label = 'last 7 days'; }
+  else { const now = Date.now(); since = weekStart(now); label = since === now - 7 * DAY ? 'last 7 days' : 'this weekly window'; }
   let calls;
   if (sessions) {
     const ids = new Set(sessions.map((s) => s.sid));
@@ -99,7 +105,7 @@ function allow(spec) {
     if (!target) continue;
     store.update(`sessions/${s.sid}.json`, s, (cur) => {
       const a = cur.agents[target.id];
-      a.allowance = (a.allowance || 0) + pct; a.denials = 0; a.lastDeniedAt = null;
+      a.allowance = (a.allowance || 0) + pct; a.denials = 0; a.lastDeniedAt = null; a.history = [];
       return cur;
     });
     store.appendLedger({ type: 'allow', session: s.sid, id: target.id, pct });
@@ -127,4 +133,4 @@ function main(argv, root, settingsFile = path.join(os.homedir(), '.claude', 'set
   }
 }
 
-module.exports = { main, allow, status, runReport, HELP };
+module.exports = { main, allow, status, runReport, weekStart, HELP };
