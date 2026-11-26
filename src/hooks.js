@@ -7,6 +7,8 @@ const { account, splitWeekPct } = require('./accounting');
 
 const SPAWN_TOOLS = new Set(['Agent', 'Task']);
 const HISTORY_KEEP = 50;
+const IDLE_MS = 10 * 60000; // an agent silent this long no longer counts as running
+const SPAWN_TTL_MS = 2 * 60000; // a spawn not started within this is treated as rejected
 
 function newAgent(id, o = {}) {
   return { id, depth: 0, agentType: null, startedAt: Date.now(), ended: false, spent: { weekPct: 0, tokens: 0, usd: 0 },
@@ -21,7 +23,9 @@ function latestState(sid) { return store.readJSON(`state/${sid}.json`, {}); }
 
 function modeOf(cfg, st) {
   if (cfg.mode === 'limits' || cfg.mode === 'dollars') return cfg.mode;
-  return st.rate_limits && st.rate_limits.seven_day ? 'limits' : 'dollars';
+  if (st.rate_limits && st.rate_limits.seven_day) return 'limits';
+  // No status line data at all (setup not run): use token caps, not list-price dollars.
+  return st.cost ? 'dollars' : 'limits';
 }
 
 function limitsFor(agent, mode, cfg, st) {
@@ -60,7 +64,8 @@ function onSessionStart(s, evt, cfg, st) {
 }
 
 function onSubagentStart(s, evt, now) {
-  const depth = s.pendingDepths.length ? s.pendingDepths.shift() : 1;
+  s.pendingDepths = s.pendingDepths.filter((p) => typeof p === 'object' && now - p.ts < SPAWN_TTL_MS);
+  const depth = s.pendingDepths.length ? s.pendingDepths.shift().depth : 1;
   s.agents[evt.agent_id] = newAgent(evt.agent_id, { depth, agentType: evt.agent_type || null, startedAt: now });
   return null;
 }
@@ -79,13 +84,15 @@ function onPreToolUse(s, evt, cfg, st, now) {
   const a = agentOf(s, evt);
   const mode = modeOf(cfg, st);
   a.toolCalls += 1;
+  a.lastSeen = now;
 
   const hash = rules.inputHash(evt.tool_name, evt.tool_input);
   const loop = rules.checkLoop(a.history, hash, now, cfg);
   a.history.push({ hash, ts: now });
   if (a.history.length > HISTORY_KEEP) a.history.splice(0, a.history.length - HISTORY_KEEP);
-  if (loop.action === 'deny') return deny(s, a, loop.reason, now);
-  if (loop.action === 'warn') note(a, loop);
+  if (loop.action === 'deny' && a.id !== 'main') return deny(s, a, loop.reason, now);
+  if (loop.action === 'deny') note(a, { key: 'loopmain', reason: loop.reason.replace('Stop repeating it', 'Check this is intended') });
+  else if (loop.action === 'warn' && a.id !== 'main') note(a, loop);
 
   if (a.id !== 'main') {
     const d = ladder.evaluate(a, limitsFor(a, mode, cfg, st), cfg, now);
@@ -106,13 +113,13 @@ function onPreToolUse(s, evt, cfg, st, now) {
   }
 
   if (SPAWN_TOOLS.has(evt.tool_name)) {
-    const active = Object.values(s.agents).filter((x) => x.id !== 'main' && !x.ended);
+    const active = Object.values(s.agents).filter((x) => x.id !== 'main' && !x.ended && now - (x.lastSeen || x.startedAt) < IDLE_MS);
     const sp = rules.checkSpawn(active, a.depth, cfg);
     if (sp.action === 'deny') return deny(s, a, sp.reason, now);
     const wk = rules.checkWeekly(st.rate_limits, cfg);
     if (wk.action === 'ask') return pre('ask', wk.reason);
     if (wk.action === 'warn') note(a, wk);
-    s.pendingDepths.push(a.depth + 1);
+    s.pendingDepths.push({ depth: a.depth + 1, ts: now });
   }
   return null;
 }
@@ -127,6 +134,7 @@ function deny(s, a, reason, now) {
 
 function onPostToolUse(s, evt, cfg, st, now) {
   const a = agentOf(s, evt);
+  a.lastSeen = now;
   const { delta, source } = account(evt);
   a.spent.tokens += delta.tokens;
   a.spent.usd += delta.usd;
@@ -168,6 +176,9 @@ function handle(evt, now = Date.now()) {
   if (!cfg.enabled || !evt.session_id) return null;
   const st = latestState(evt.session_id);
   let out = null;
+  if (evt.hook_event_name === 'SessionStart') {
+    try { const root = require('path').resolve(__dirname, '..'); if (store.readJSON('root.json', {}).root !== root) store.writeJSON('root.json', { root }); } catch (e) { store.logError(e); }
+  }
   store.update(`sessions/${evt.session_id}.json`, null, (s) => {
     s = s || newSession(evt.session_id, now);
     switch (evt.hook_event_name) {
@@ -179,7 +190,7 @@ function handle(evt, now = Date.now()) {
       default: out = null;
     }
     return s;
-  });
+  }, { required: true });
   return out;
 }
 
