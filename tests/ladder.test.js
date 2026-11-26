@@ -23,5 +23,5 @@ test('100% denies with exact reason', () => {
 test('100% after 5 denials is hardstop', () => assert.equal(evaluate(at(1, { denials: 5 }), limits, cfg, NOW).action, 'hardstop'));
 test('tool calls alone deny', () => assert.equal(evaluate(rec({ toolCalls: 250 }), limits, cfg, NOW).action, 'deny'));
 test('minutes alone deny', () => assert.equal(evaluate(rec({ startedAt: NOW - 46 * 60000 }), limits, cfg, NOW).action, 'deny'));
-test('allowance raises the cap', () => assert.equal(evaluate(at(1.2, { allowance: 0.5 }), limits, cfg, NOW).action, 'allow'));
+test('allowance raises the cap', () => assert.equal(evaluate(at(1.2, { allowance: 0.5, warned: ['warn75'] }), limits, cfg, NOW).action, 'allow'));
 test('missing limits are ignored', () => assert.equal(evaluate(at(5), { toolCalls: 250 }, cfg, NOW).action, 'allow'));
