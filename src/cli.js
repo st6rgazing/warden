@@ -32,15 +32,43 @@ function latestRateLimits() {
   } catch { return undefined; }
 }
 
+// Restrict session totals to usage logged inside the window. Week % is scaled
+// by the share of the agent's tokens that fall in the window.
+function windowed(sessions, calls) {
+  const byAgent = new Map();
+  for (const c of calls) {
+    const k = `${c.session}\0${c.id}`;
+    const v = byAgent.get(k) || { tokens: 0, usd: 0, calls: 0 };
+    v.tokens += c.tokens || 0; v.usd += c.usd || 0; v.calls += 1;
+    byAgent.set(k, v);
+  }
+  return sessions.map((s) => {
+    const agents = {};
+    for (const [id, a] of Object.entries(s.agents || {})) {
+      const w = byAgent.get(`${s.sid}\0${id}`);
+      if (!w) continue;
+      const sp = a.spent || {};
+      const share = sp.tokens > 0 ? Math.min(1, w.tokens / sp.tokens) : 1;
+      agents[id] = { ...a, spent: { weekPct: (sp.weekPct || 0) * share, tokens: w.tokens, usd: w.usd }, toolCalls: w.calls };
+    }
+    return { ...s, agents };
+  }).filter((s) => Object.keys(s.agents).length);
+}
+
 function runReport(args, cwd = process.cwd()) {
   const all = sessionFiles();
   let sessions, since, label;
   if (args.includes('--session')) { sessions = all.slice(0, 1); since = sessions[0] ? sessions[0].startedAt : Date.now(); label = 'latest session'; }
   else if (args.includes('--today')) { since = Date.now() - DAY; label = 'last 24 hours'; }
   else { since = Date.now() - 7 * DAY; label = 'last 7 days'; }
-  if (!sessions) sessions = all.filter((s) => (s.startedAt || 0) >= since);
-  const ids = new Set(sessions.map((s) => s.sid));
-  const calls = store.readLedger(since).filter((e) => e.type === 'call' && ids.has(e.session));
+  let calls;
+  if (sessions) {
+    const ids = new Set(sessions.map((s) => s.sid));
+    calls = store.readLedger(since).filter((e) => e.type === 'call' && ids.has(e.session));
+  } else {
+    calls = store.readLedger(since).filter((e) => e.type === 'call');
+    sessions = windowed(all.filter((s) => (s.updatedAt || s.startedAt || 0) >= since), calls);
+  }
   const text = report({ sessions, calls, latest: latestRateLimits(), label });
   if (args.includes('--md')) {
     const file = path.join(cwd, `warden-report-${new Date().toISOString().slice(0, 10)}.md`);
