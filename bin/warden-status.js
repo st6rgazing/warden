@@ -25,7 +25,7 @@ process.stdin.on('end', () => {
     const orig = store.readJSON('statusline.json', null);
     if (orig && orig.command) {
       const r = spawnSync(orig.command, { shell: true, input, timeout: 1000, encoding: 'utf8' });
-      if (r.status === 0 && r.stdout) line = r.stdout.trim();
+      if (r.stdout && r.stdout.trim()) line = r.stdout.trim();
     }
   } catch (e) {
     try { require('../src/store').logError(e); } catch { /* ignore */ }
